@@ -29,6 +29,16 @@ pub mod error_helpers {
     use image::{GenericImage, GenericImageView};
     use super::position_helpers::Position;
 
+    pub fn get_median_zone_length(zones: &Vec<Vec<Position>>) -> usize {
+        let mut lengths = Vec::new();
+        for zone in zones {
+            lengths.push(zone.len());
+        }
+        lengths.sort();
+        let mid = lengths.len()/2;
+        lengths[mid]
+    }
+
     pub fn get_zone_mse(zone: &Vec<Position>, src: &image::DynamicImage) -> f32 {
         if zone.len() == 0 {
             return 0.0;

@@ -3,7 +3,7 @@ use rand::prelude::*;
 
 mod helpers;
 use helpers::position_helpers::{Position, get_closest_point};
-use helpers::error_helpers::{get_zone_average, get_zone_mse};
+use helpers::error_helpers::{get_zone_average, get_zone_mse, get_median_zone_length};
 
 
 struct Voronoi {
@@ -21,12 +21,10 @@ fn main() {
         println!("Entering round {:}", i);
         add_point_to_voronoi(&mut voronoi, &src);
         recalculate_voronoi_zones(&mut voronoi, &src);
-        if i%50 == 0 {
+        if i%10 == 0 {
             save_voronoi(&voronoi, &src, format!("results/voronoi_{:}.png", i));
         }
     }
-    let img = create_voronoi(&src);
-    img.save("results/voronoi.png");
 }
 
 fn initiate_voronoi(src: &image::DynamicImage, num_points: u32) -> Voronoi {
@@ -52,7 +50,11 @@ fn add_point_to_voronoi(voronoi: &mut Voronoi, src: &image::DynamicImage) {
     /// in the same zone
     let mut highest_mse = 0.0;
     let mut highest_point_index = 0 as usize;
+    let median_zone_length = get_median_zone_length(&voronoi.zones);
     for (i, zone) in voronoi.zones.iter().enumerate() {
+        if zone.len() < median_zone_length {
+            continue;
+        }
         let zone_mse = get_zone_mse(&zone, &src);
         if zone_mse > highest_mse {
             highest_mse = zone_mse;
@@ -65,13 +67,18 @@ fn add_point_to_voronoi(voronoi: &mut Voronoi, src: &image::DynamicImage) {
     let rand_point_index_2 = rng.gen_range(0, high_zone.len() as u32);
     let rand_point_1 = high_zone[rand_point_index_1 as usize].clone();
     let rand_point_2 = high_zone[rand_point_index_2 as usize].clone();
-    // voronoi.points[highest_point_index] = rand_point_1;
+    voronoi.points[highest_point_index] = rand_point_1;
     voronoi.points.push(rand_point_2);
     voronoi.zones.push(Vec::new());
     println!("Highest mse in zone : {:}", highest_point_index);
 }
 
 fn recalculate_voronoi_zones(voronoi: &mut Voronoi, src: &image::DynamicImage) {
+    // TODO (24 Sep 2019 sam): Lot of room to improve performance here. 
+    // Need to check whether the clear() call is efficient (with terms of 
+    // uneccesary reallocation of memory.
+    // We also don't need to recalculate *all* the zones. We just need to
+    // recalculate the closest ones.
     let (image_width, image_height) = src.dimensions();
     for i in 0..voronoi.points.len() {
         voronoi.zones[i].clear();
@@ -95,30 +102,5 @@ fn save_voronoi(voronoi: &Voronoi, src: &image::DynamicImage, filename: String) 
         }
     }
     dest.save(filename);
-}
-
-fn create_voronoi(src: &image::DynamicImage) -> image::DynamicImage {
-    let (image_width, image_height) = src.dimensions();
-    let mut dest = image::DynamicImage::new_rgb8(image_width, image_height);
-    let mut rng = rand::thread_rng();
-    let mut points = Vec::new();
-    let mut colours = Vec::new();
-    for _ in 0..10 {
-        let x = rng.gen_range(0, image_width as u32);
-        let y = rng.gen_range(0, image_height as u32);
-        points.push( Position {x: x, y: y} );
-        let r = rng.gen_range(0, 255 as u8);
-        let g = rng.gen_range(0, 255 as u8);
-        let b = rng.gen_range(0, 255 as u8);
-        colours.push( [r, g, b] );
-    }
-    for x in 0..image_width {
-        for y in 0..image_height {
-            let closest_index = get_closest_point(&Position {x:x, y:y}, &points);
-            let colour = colours[closest_index];
-            dest.put_pixel(x, y, image::Rgba{ 0: [colour[0] as u8, colour[1] as u8, colour[2] as u8, 255 as u8]});
-        }
-    }
-    dest
 }
 
