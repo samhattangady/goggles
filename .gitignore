@@ -3,4 +3,5 @@
 
 *.swp
 results/*
+results*/
 src/main2.rs
